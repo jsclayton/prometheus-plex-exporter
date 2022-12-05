@@ -6,30 +6,7 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/jrudio/go-plex-client"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
-
-const (
-	statePlaying = "playing"
-	stateStopped = "stopped"
-	statePaused  = "paused"
-	stateBuffer  = "buffering"
-)
-
-var (
-	// TODO - Add tons more labels here:  media type, library name, series name, season number, etc.
-	metricPlaysTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "plays_total",
-		Help: "The total number of play counts",
-	}, []string{"user", "title"})
-
-	activeSessions = map[string]struct{}{}
-)
-
-func recordPlay(user, title string) {
-	metricPlaysTotal.WithLabelValues(user, title).Inc()
-}
 
 func getSessionByID(sessions plex.CurrentSessions, sessionID string) *plex.Metadata {
 	for _, session := range sessions.MediaContainer.Metadata {
@@ -47,9 +24,9 @@ func onPlaying(conn *plex.Plex, c plex.NotificationContainer) error {
 	}
 
 	for _, n := range c.PlaySessionStateNotification {
-		if n.State == stateStopped {
-			// When state is stopped the session is ended.
-			delete(activeSessions, n.SessionKey)
+		if sessionState(n.State) == stateStopped {
+			// When the session is stopped we can't look up the user info or media anymore.
+			activeSessions.Update(n.SessionKey, sessionState(n.State), nil, nil)
 			continue
 		}
 
@@ -63,29 +40,16 @@ func onPlaying(conn *plex.Plex, c plex.NotificationContainer) error {
 			return fmt.Errorf("error fetching metadata for key %s: %w", n.RatingKey, err)
 		}
 
-		userName := session.User.Title
-		userID := session.User.ID
-		mediaID := metadata.MediaContainer.Metadata[0].RatingKey
-		title := metadata.MediaContainer.Metadata[0].Title
-		timestamp := time.Duration(time.Millisecond) * time.Duration(n.ViewOffset)
-
 		level.Info(log).Log("msg", "Received PlaySessionStateNotification",
 			"SessionKey", n.SessionKey,
-			"userName", userName,
-			"userID", userID,
+			"userName", session.User.Title,
+			"userID", session.User.ID,
 			"state", n.State,
-			"mediaTitle", title,
-			"mediaID", mediaID,
-			"timestamp", timestamp)
+			"mediaTitle", metadata.MediaContainer.Metadata[0].Title,
+			"mediaID", metadata.MediaContainer.Metadata[0].RatingKey,
+			"timestamp", time.Duration(time.Millisecond)*time.Duration(n.ViewOffset))
 
-		switch n.State {
-		case statePlaying:
-			if _, ok := activeSessions[n.SessionKey]; !ok {
-				// New session
-				activeSessions[n.SessionKey] = struct{}{}
-				recordPlay(userName, title)
-			}
-		}
+		activeSessions.Update(n.SessionKey, sessionState(n.State), &session.User, &sessions.MediaContainer.Metadata[0])
 	}
 
 	return nil
