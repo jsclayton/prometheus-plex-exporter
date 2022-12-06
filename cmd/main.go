@@ -6,8 +6,9 @@ import (
 
 	kitlog "github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/jrudio/go-plex-client"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	plex_listener "github.com/grafana/plexporter/pkg/plex"
 )
 
 var (
@@ -28,55 +29,7 @@ func main() {
 		return
 	}
 
-	level.Info(log).Log("msg", "Connecting", "server", serverAddress, "token", plexToken)
-
-	conn, err := plex.New(serverAddress, plexToken)
-	if err != nil {
-		level.Error(log).Log("msg", "Failed to connect", "err", err)
-		return
-	}
-
-	machineID, err := conn.GetMachineID()
-	if err != nil {
-		level.Error(log).Log("msg", "Failed to get machine ID", "err", err)
-		return
-	}
-
-	servers, err := conn.GetServersInfo()
-	if err != nil {
-		level.Error(log).Log("msg", "Failed to get server listing", "err", err)
-		return
-	}
-
-	// Now find our server in the list
-	serverName := ""
-	for _, server := range servers.Server {
-		if server.MachineIdentifier == machineID {
-			serverName = server.Name
-			break
-		}
-	}
-
-	level.Info(log).Log("msg", "Successfully connected", "machineID", machineID, "server", serverName)
-
-	activeSessions = NewSessions(serverName)
-
-	ctrlC := make(chan os.Signal, 1)
-
-	onError := func(err error) {
-		level.Error(log).Log("msg", "error in websocket processing", "err", err)
-	}
-
-	events := plex.NewNotificationEvents()
-	events.OnPlaying(func(n plex.NotificationContainer) {
-		err := onPlaying(conn, n)
-		if err != nil {
-			level.Error(log).Log("msg", "error handling OnPlaying event", "event", n, "err", err)
-		}
-	})
-
-	// TODO - Does this automatically reconnect on websocket failure?
-	conn.SubscribeToNotifications(events, ctrlC, onError)
+	plex_listener.Listen(serverAddress, plexToken, log)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8000", nil)

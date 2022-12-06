@@ -1,4 +1,4 @@
-package main
+package plex
 
 import (
 	"sync"
@@ -6,7 +6,8 @@ import (
 
 	"github.com/jrudio/go-plex-client"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/grafana/plexporter/pkg/metrics"
 )
 
 type sessionState string
@@ -20,20 +21,6 @@ const (
 	mediaTypeEpisode = "episode"
 
 	sessionTimeout = time.Minute
-)
-
-var (
-	metricPlaysTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "plays_total",
-		Help: "The total number of play counts",
-	}, []string{"server", "library_section", "media_type", "title", "season", "episode_title", "user"})
-
-	metricPlaySecondsTotalDesc = prometheus.NewDesc(
-		"play_seconds_total",
-		"Total play time per session",
-		[]string{"server", "library_section", "media_type", "title", "season", "episode_title", "user", "session"},
-		nil,
-	)
 )
 
 type session struct {
@@ -88,7 +75,7 @@ func (s *sessions) Update(sessionID string, newState sessionState, user *plex.Us
 	// If session playing something for the first time, then record a new play
 	if newState == statePlaying && session.playStarted.IsZero() && user != nil && media != nil {
 		title, season, episode := labels(*media)
-		metricPlaysTotal.WithLabelValues(
+		metrics.Play(
 			s.serverName,
 			media.LibrarySectionTitle,
 			media.Type,
@@ -96,7 +83,7 @@ func (s *sessions) Update(sessionID string, newState sessionState, user *plex.Us
 			season,
 			episode,
 			user.Title,
-		).Inc()
+		)
 	}
 
 	if user != nil {
@@ -124,7 +111,7 @@ func (s *sessions) Update(sessionID string, newState sessionState, user *plex.Us
 }
 
 func (s *sessions) Describe(ch chan<- *prometheus.Desc) {
-	ch <- metricPlaySecondsTotalDesc
+	ch <- metrics.MetricPlaySecondsTotalDesc
 }
 
 func (s *sessions) Collect(ch chan<- prometheus.Metric) {
@@ -141,8 +128,7 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 
 		title, season, episode := labels(session.media)
 
-		ch <- prometheus.MustNewConstMetric(metricPlaySecondsTotalDesc,
-			prometheus.CounterValue,
+		ch <- metrics.PlayDuration(
 			float64(totalPlayTime.Seconds()),
 			s.serverName,
 			session.media.LibrarySectionTitle,
