@@ -130,7 +130,9 @@ local durationDayBar =
 
 local playback_dashboard =
   grafana.dashboard.new(
-    'Playback', uid=std.md5('playback.json')
+    'Playback',
+    uid=std.md5('playback.json'),
+    time_from='now-7d',
   )
   .addTemplates([
     ds_template,
