@@ -7,9 +7,9 @@ services:
     ports:
       - 3000:3000/tcp
     environment:
-      GF_AUTH_ANONYMOUS_ENABLED: true
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-      GF_AUTH_DISABLE_LOGIN_FORM: true
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
     volumes:
       - ./data/grafana/data:/var/lib/grafana
       - ./data/grafana/provisioning:/etc/grafana/provisioning
