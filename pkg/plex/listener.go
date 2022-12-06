@@ -11,20 +11,22 @@ import (
 )
 
 type plexListener struct {
+	client         *Client
 	conn           *plex.Plex
 	activeSessions *sessions
 	log            log.Logger
 }
 
-func Listen(client *Client, log log.Logger) error {
-	conn, err := plex.New(client.URL.String(), client.Token)
+func (c *Client) Listen(log log.Logger) error {
+	conn, err := plex.New(c.URL.String(), c.Token)
 	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", client.URL.String(), err)
+		return fmt.Errorf("failed to connect to %s: %w", c.URL.String(), err)
 	}
 
 	l := &plexListener{
+		client:         c,
 		conn:           conn,
-		activeSessions: NewSessions(client.Name, client.Identifier),
+		activeSessions: NewSessions(c.Name, c.Identifier),
 		log:            log,
 	}
 
@@ -40,7 +42,7 @@ func Listen(client *Client, log log.Logger) error {
 	// TODO - Does this automatically reconnect on websocket failure?
 	conn.SubscribeToNotifications(events, ctrlC, onError)
 
-	level.Info(log).Log("msg", "Successfully connected", "machineID", client.Identifier, "server", client.Name)
+	level.Info(log).Log("msg", "Successfully connected", "machineID", c.Identifier, "server", c.Name)
 
 	return nil
 }
