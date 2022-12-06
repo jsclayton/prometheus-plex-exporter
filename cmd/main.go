@@ -36,7 +36,30 @@ func main() {
 		return
 	}
 
-	level.Info(log).Log("msg", "Successfully connected", "conn", conn)
+	machineID, err := conn.GetMachineID()
+	if err != nil {
+		level.Error(log).Log("msg", "Failed to get machine ID", "err", err)
+		return
+	}
+
+	servers, err := conn.GetServersInfo()
+	if err != nil {
+		level.Error(log).Log("msg", "Failed to get server listing", "err", err)
+		return
+	}
+
+	// Now find our server in the list
+	serverName := ""
+	for _, server := range servers.Server {
+		if server.MachineIdentifier == machineID {
+			serverName = server.Name
+			break
+		}
+	}
+
+	level.Info(log).Log("msg", "Successfully connected", "machineID", machineID, "server", serverName)
+
+	activeSessions = NewSessions(serverName)
 
 	ctrlC := make(chan os.Signal, 1)
 

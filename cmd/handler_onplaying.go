@@ -8,6 +8,8 @@ import (
 	"github.com/jrudio/go-plex-client"
 )
 
+var activeSessions *sessions
+
 func getSessionByID(sessions plex.CurrentSessions, sessionID string) *plex.Metadata {
 	for _, session := range sessions.MediaContainer.Metadata {
 		if sessionID == session.SessionKey {

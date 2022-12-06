@@ -17,6 +17,8 @@ const (
 	statePaused    sessionState = "paused"
 	stateBuffering sessionState = "buffering"
 
+	mediaTypeEpisode = "episode"
+
 	sessionTimeout = time.Minute
 )
 
@@ -24,16 +26,14 @@ var (
 	metricPlaysTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "plays_total",
 		Help: "The total number of play counts",
-	}, []string{"library_section", "media_type", "grandparent_title", "parent_title", "title", "user"})
+	}, []string{"server", "library_section", "media_type", "title", "season", "episode_title", "user"})
 
 	metricPlaySecondsTotalDesc = prometheus.NewDesc(
 		"play_seconds_total",
 		"Total play time per session",
-		[]string{"library_section", "media_type", "grandparent_title", "parent_title", "title", "user", "session"},
+		[]string{"server", "library_section", "media_type", "title", "season", "episode_title", "user", "session"},
 		nil,
 	)
-
-	activeSessions = NewSessions()
 )
 
 type session struct {
@@ -46,13 +46,15 @@ type session struct {
 }
 
 type sessions struct {
-	mtx      sync.Mutex
-	sessions map[string]session
+	mtx        sync.Mutex
+	sessions   map[string]session
+	serverName string
 }
 
-func NewSessions() *sessions {
+func NewSessions(serverName string) *sessions {
 	s := &sessions{
-		sessions: map[string]session{},
+		sessions:   map[string]session{},
+		serverName: serverName,
 	}
 
 	ticker := time.NewTicker(time.Minute)
@@ -81,16 +83,18 @@ func (s *sessions) Update(sessionID string, newState sessionState, user *plex.Us
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	session, ok := s.sessions[sessionID]
+	session := s.sessions[sessionID]
 
-	// If new session playing something, then record a new play
-	if !ok && newState == statePlaying && user != nil && media != nil {
+	// If session playing something for the first time, then record a new play
+	if newState == statePlaying && session.playStarted.IsZero() && user != nil && media != nil {
+		title, season, episode := labels(*media)
 		metricPlaysTotal.WithLabelValues(
+			s.serverName,
 			media.LibrarySectionTitle,
 			media.Type,
-			media.GrandparentTitle,
-			media.ParentTitle,
-			media.Title,
+			title,
+			season,
+			episode,
 			user.Title,
 		).Inc()
 	}
@@ -135,16 +139,26 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 			totalPlayTime += time.Since(session.playStarted)
 		}
 
+		title, season, episode := labels(session.media)
+
 		ch <- prometheus.MustNewConstMetric(metricPlaySecondsTotalDesc,
 			prometheus.CounterValue,
 			float64(totalPlayTime.Seconds()),
+			s.serverName,
 			session.media.LibrarySectionTitle,
 			session.media.Type,
-			session.media.GrandparentTitle, // for tv shows this is the series
-			session.media.ParentTitle,      // for tv shows this is the season
-			session.media.Title,            // for tv shows this is the episode title
+			title,
+			season,
+			episode,
 			session.user.Title,
 			id,
 		)
 	}
+}
+
+func labels(m plex.Metadata) (title, season, episodeTitle string) {
+	if m.Type == mediaTypeEpisode {
+		return m.GrandparentTitle, m.ParentTitle, m.Title
+	}
+	return m.Title, "", ""
 }
