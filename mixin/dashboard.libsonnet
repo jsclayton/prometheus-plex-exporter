@@ -6,15 +6,15 @@ local utils = import 'snmp-mixin/lib/utils.libsonnet';
 
 local matcher = 'job=~"$job", instance=~"$instance"';
 
-local dow = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
+local dow = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
 local queries = {
   duration_by_day_bc: '(sum(increase(play_seconds_total[24h])) and on() day_of_week(timestamp(play_seconds_total)) == %d) or vector(0)',
@@ -107,8 +107,8 @@ local durationDayBar =
   )
   .addTargets(
     [
-      grafana.prometheus.target(std.format(queries.duration_by_day_bc, dow[day]), legendFormat=day)
-      for day in std.objectFields(dow)
+      grafana.prometheus.target(std.format(queries.duration_by_day_bc, day), legendFormat=dow[day],)
+      for day in std.range(0, std.length(dow)-1)
     ]
   ) {
     span: 6,
