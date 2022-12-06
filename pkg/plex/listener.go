@@ -45,7 +45,7 @@ func Listen(serverAddress, token string, log log.Logger) error {
 
 	l := &plexListener{
 		conn:           conn,
-		activeSessions: NewSessions(serverName),
+		activeSessions: NewSessions(serverName, machineID),
 		log:            log,
 	}
 
@@ -114,7 +114,7 @@ func (l *plexListener) onPlaying(c plex.NotificationContainer) error {
 			"mediaID", metadata.MediaContainer.Metadata[0].RatingKey,
 			"timestamp", time.Duration(time.Millisecond)*time.Duration(n.ViewOffset))
 
-		l.activeSessions.Update(n.SessionKey, sessionState(n.State), &session.User, &sessions.MediaContainer.Metadata[0])
+		l.activeSessions.Update(n.SessionKey, sessionState(n.State), session, &metadata.MediaContainer.Metadata[0])
 	}
 
 	return nil

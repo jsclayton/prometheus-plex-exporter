@@ -1,6 +1,7 @@
 package plex
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -20,11 +21,14 @@ const (
 
 	mediaTypeEpisode = "episode"
 
+	// How long metrics for sessions are kept after the last update.
+	// This is used to prune prometheus metrics and keep cardinality
+	// down.
 	sessionTimeout = time.Minute
 )
 
 type session struct {
-	user           plex.User
+	session        plex.Metadata
 	media          plex.Metadata
 	state          sessionState
 	lastUpdate     time.Time
@@ -35,13 +39,15 @@ type session struct {
 type sessions struct {
 	mtx        sync.Mutex
 	sessions   map[string]session
+	serverID   string
 	serverName string
 }
 
-func NewSessions(serverName string) *sessions {
+func NewSessions(serverName, serverID string) *sessions {
 	s := &sessions{
 		sessions:   map[string]session{},
 		serverName: serverName,
+		serverID:   serverID,
 	}
 
 	ticker := time.NewTicker(time.Minute)
@@ -66,28 +72,14 @@ func (s *sessions) pruneOldSessions() {
 	}
 }
 
-func (s *sessions) Update(sessionID string, newState sessionState, user *plex.User, media *plex.Metadata) {
+func (s *sessions) Update(sessionID string, newState sessionState, newSession *plex.Metadata, media *plex.Metadata) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
 	session := s.sessions[sessionID]
 
-	// If session playing something for the first time, then record a new play
-	if newState == statePlaying && session.playStarted.IsZero() && user != nil && media != nil {
-		title, season, episode := labels(*media)
-		metrics.Play(
-			s.serverName,
-			media.LibrarySectionTitle,
-			media.Type,
-			title,
-			season,
-			episode,
-			user.Title,
-		)
-	}
-
-	if user != nil {
-		session.user = *user
+	if newSession != nil {
+		session.session = *newSession
 	}
 
 	if media != nil {
@@ -111,6 +103,7 @@ func (s *sessions) Update(sessionID string, newState sessionState, user *plex.Us
 }
 
 func (s *sessions) Describe(ch chan<- *prometheus.Desc) {
+	ch <- metrics.MetricPlayCountDesc
 	ch <- metrics.MetricPlaySecondsTotalDesc
 }
 
@@ -119,24 +112,58 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 	defer s.mtx.Unlock()
 
 	for id, session := range s.sessions {
-
-		totalPlayTime := session.prevPlayedTime
-
-		if session.state == statePlaying {
-			totalPlayTime += time.Since(session.playStarted)
+		if session.playStarted.IsZero() {
+			continue
 		}
 
 		title, season, episode := labels(session.media)
 
-		ch <- metrics.PlayDuration(
-			float64(totalPlayTime.Seconds()),
+		ch <- metrics.Play(
+			1.0,
+			"plex",
 			s.serverName,
+			s.serverID,
 			session.media.LibrarySectionTitle,
+			session.media.LibrarySectionID.String(),
+			"", // Library type?
 			session.media.Type,
 			title,
 			season,
 			episode,
-			session.user.Title,
+			session.session.Media[0].Part[0].Decision,      // stream type
+			session.session.Media[0].VideoResolution,       // stream res
+			session.media.Media[0].VideoResolution,         // file res
+			strconv.Itoa(session.session.Media[0].Bitrate), // bitrate
+			session.session.Player.Device,                  // device
+			session.session.Player.Product,                 // device type
+			session.session.User.Title,
+			id,
+		)
+
+		totalPlayTime := session.prevPlayedTime
+		if session.state == statePlaying {
+			totalPlayTime += time.Since(session.playStarted)
+		}
+
+		ch <- metrics.PlayDuration(
+			float64(totalPlayTime.Seconds()),
+			"plex",
+			s.serverName,
+			s.serverID,
+			session.media.LibrarySectionTitle,
+			session.media.LibrarySectionID.String(),
+			"", // Library type?
+			session.media.Type,
+			title,
+			season,
+			episode,
+			session.session.Media[0].Part[0].Decision,      // stream type
+			session.session.Media[0].VideoResolution,       // stream res
+			session.media.Media[0].VideoResolution,         // file res
+			strconv.Itoa(session.session.Media[0].Bitrate), // bitrate
+			session.session.Player.Device,                  // device
+			session.session.Player.Product,                 // device type
+			session.session.User.Title,
 			id,
 		)
 	}
