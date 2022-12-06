@@ -79,7 +79,7 @@ local server_template =
   grafana.template.new(
     'server',
     '$datasource',
-    'label_values(plays_total{job=~"$job", instance=~"$instance"})',
+    'label_values(plays_total{job=~"$job", instance=~"$instance"}, server)',
     label='server',
     refresh='load',
     multi=true,
