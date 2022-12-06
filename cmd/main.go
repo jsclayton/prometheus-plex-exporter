@@ -29,7 +29,13 @@ func main() {
 		return
 	}
 
-	plex_listener.Listen(serverAddress, plexToken, log)
+	client, err := plex_listener.NewClient(serverAddress, plexToken)
+	if err != nil {
+		level.Error(log).Log("msg", err)
+		return
+	}
+
+	plex_listener.Listen(client, log)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8000", nil)

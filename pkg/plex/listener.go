@@ -16,36 +16,15 @@ type plexListener struct {
 	log            log.Logger
 }
 
-func Listen(serverAddress, token string, log log.Logger) error {
-	level.Info(log).Log("msg", "Connecting", "server", serverAddress, "token", token)
-
-	conn, err := plex.New(serverAddress, token)
+func Listen(client *Client, log log.Logger) error {
+	conn, err := plex.New(client.URL.String(), client.Token)
 	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", serverAddress, err)
-	}
-
-	machineID, err := conn.GetMachineID()
-	if err != nil {
-		return fmt.Errorf("failed to get machine ID %s: %w", machineID, err)
-	}
-
-	servers, err := conn.GetServersInfo()
-	if err != nil {
-		return fmt.Errorf("failed to get server listing: %w", err)
-	}
-
-	// Now find our server in the list
-	serverName := ""
-	for _, server := range servers.Server {
-		if server.MachineIdentifier == machineID {
-			serverName = server.Name
-			break
-		}
+		return fmt.Errorf("failed to connect to %s: %w", client.URL.String(), err)
 	}
 
 	l := &plexListener{
 		conn:           conn,
-		activeSessions: NewSessions(serverName, machineID),
+		activeSessions: NewSessions(client.Name, client.Identifier),
 		log:            log,
 	}
 
@@ -61,7 +40,7 @@ func Listen(serverAddress, token string, log log.Logger) error {
 	// TODO - Does this automatically reconnect on websocket failure?
 	conn.SubscribeToNotifications(events, ctrlC, onError)
 
-	level.Info(log).Log("msg", "Successfully connected", "machineID", machineID, "server", serverName)
+	level.Info(log).Log("msg", "Successfully connected", "machineID", client.Identifier, "server", client.Name)
 
 	return nil
 }
