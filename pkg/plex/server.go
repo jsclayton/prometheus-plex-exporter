@@ -23,7 +23,6 @@ type Server struct {
 
 	mtx       sync.Mutex
 	libraries []*Library
-	stats     StatisticsResources
 }
 
 type StatisticsResources struct {
@@ -131,7 +130,11 @@ func (s *Server) Refresh() error {
 	// This is a paid feature and API may not be available
 	if len(resources.MediaContainer.StatisticsResources) > 0 {
 		// The last entry is the most recent
-		s.stats = resources.MediaContainer.StatisticsResources[len(resources.MediaContainer.StatisticsResources)-1]
+		i := len(resources.MediaContainer.StatisticsResources) - 1
+		stats := resources.MediaContainer.StatisticsResources[i]
+
+		metrics.ServerHostCpuUtilization.WithLabelValues("plex", s.Name, s.ID).Set(stats.HostCpuUtil)
+		metrics.ServerHostMemUtilization.WithLabelValues("plex", s.Name, s.ID).Set(stats.HostMemUtil)
 	}
 	return nil
 }
@@ -149,9 +152,6 @@ func (s *Server) Library(id string) *Library {
 }
 
 func (s *Server) Describe(ch chan<- *prometheus.Desc) {
-	ch <- metrics.MetricsServerHostCpuUtilizationDesc
-	ch <- metrics.MetricsServerHostMemUtilizationDesc
-
 	ch <- metrics.MetricsLibraryDurationTotalDesc
 	ch <- metrics.MetricsLibraryStorageTotalDesc
 
@@ -162,9 +162,6 @@ func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	s.mtx.Lock()
-
-	ch <- metrics.ServerHostCpuUtilization(s.stats.HostCpuUtil, "plex", s.Name, s.ID)
-	ch <- metrics.ServerHostMemUtilization(s.stats.HostMemUtil, "plex", s.Name, s.ID)
 
 	for _, library := range s.libraries {
 		ch <- metrics.LibraryDuration(library.DurationTotal,
