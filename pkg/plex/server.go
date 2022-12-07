@@ -23,6 +23,15 @@ type Server struct {
 
 	mtx       sync.Mutex
 	libraries []*Library
+	stats     StatisticsResources
+}
+
+type StatisticsResources struct {
+	At             int     `json:"at"`
+	HostCpuUtil    float64 `json:"hostCpuUtilization"`
+	HostMemUtil    float64 `json:"hostMemoryUtilization"`
+	ProcessCpuUtil float64 `json:"processCpuUtilization"`
+	ProcessMemUtil float64 `json:"processMemoryUtilization"`
 }
 
 func NewServer(serverURL, token string) (*Server, error) {
@@ -85,7 +94,7 @@ func (s *Server) Refresh() error {
 	s.ID = container.MediaContainer.MachineIdentifier
 	s.Name = container.MediaContainer.FriendlyName
 	s.Version = container.MediaContainer.Version
-
+	s.libraries = nil
 	for _, provider := range container.MediaContainer.MediaProviders {
 		if provider.Identifier != "com.plexapp.plugins.library" {
 			continue
@@ -109,6 +118,21 @@ func (s *Server) Refresh() error {
 			}
 		}
 	}
+
+	resources := struct {
+		MediaContainer struct {
+			StatisticsResources []StatisticsResources `json:"StatisticsResources"`
+		} `json:"MediaContainer"`
+	}{}
+	err = s.Client.Get("/statistics/resources?timespan=6", &resources)
+	if err != nil && err != ErrNotFound {
+		return err
+	}
+	// This is a paid feature and API may not be available
+	if len(resources.MediaContainer.StatisticsResources) > 0 {
+		// The last entry is the most recent
+		s.stats = resources.MediaContainer.StatisticsResources[len(resources.MediaContainer.StatisticsResources)-1]
+	}
 	return nil
 }
 
@@ -125,6 +149,9 @@ func (s *Server) Library(id string) *Library {
 }
 
 func (s *Server) Describe(ch chan<- *prometheus.Desc) {
+	ch <- metrics.MetricsServerHostCpuUtilizationDesc
+	ch <- metrics.MetricsServerHostMemUtilizationDesc
+
 	ch <- metrics.MetricsLibraryDurationTotalDesc
 	ch <- metrics.MetricsLibraryStorageTotalDesc
 
@@ -135,6 +162,9 @@ func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	s.mtx.Lock()
+
+	ch <- metrics.ServerHostCpuUtilization(s.stats.HostCpuUtil, "plex", s.Name, s.ID)
+	ch <- metrics.ServerHostMemUtilization(s.stats.HostMemUtil, "plex", s.Name, s.ID)
 
 	for _, library := range s.libraries {
 		ch <- metrics.LibraryDuration(library.DurationTotal,

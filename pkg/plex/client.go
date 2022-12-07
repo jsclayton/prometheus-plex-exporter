@@ -2,10 +2,13 @@ package plex
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type Client struct {
 	Token string
@@ -53,6 +56,10 @@ func (c *Client) Do(request *http.Request, data any) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return ErrNotFound
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

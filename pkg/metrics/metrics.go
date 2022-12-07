@@ -5,22 +5,19 @@ import (
 )
 
 var (
-	libraryLabels = []string{
-		"server_type",  // Backend type: plex
-		"server",       // Server friendly name
-		"server_id",    // Server unique id
+	serverLabels = []string{
+		"server_type", // Backend type: plex
+		"server",      // Server friendly name
+		"server_id",   // Server unique id
+	}
+
+	libraryLabels = append(append([]string(nil), serverLabels...),
 		"library_type", // movie, show, or artist ?
 		"library",      // Library friendly name
 		"library_id",   // Library unique id
-	}
+	)
 
-	playLabels = []string{
-		"server_type",            // Backend type: plex
-		"server",                 // Server friendly name
-		"server_id",              // Server unique id
-		"library",                // Library friendly name
-		"library_id",             // Library unique id
-		"library_type",           // Movies, tv_shows, music, or live_tv ?
+	playLabels = append(append([]string(nil), libraryLabels...),
 		"media_type",             // Movies, tv_shows, music, or live_tv
 		"title",                  // For tv shows this is the series title. For music this is the artist.
 		"child_title",            // For tv shows this is the season title. For music this is the album title.
@@ -33,7 +30,21 @@ var (
 		"device_type",            //
 		"user",                   // User name
 		"session",
-	}
+	)
+
+	MetricsServerHostCpuUtilizationDesc = prometheus.NewDesc(
+		"host_cpu_util",
+		"The host's cpu utilization",
+		serverLabels,
+		nil,
+	)
+
+	MetricsServerHostMemUtilizationDesc = prometheus.NewDesc(
+		"host_mem_util",
+		"The host's memory utilization",
+		serverLabels,
+		nil,
+	)
 
 	MetricsLibraryDurationTotalDesc = prometheus.NewDesc(
 		"library_duration_total",
@@ -66,6 +77,24 @@ var (
 
 func Register(collectors ...prometheus.Collector) {
 	prometheus.MustRegister(collectors...)
+}
+
+func ServerHostCpuUtilization(value float64, serverType, serverName, serverID string) prometheus.Metric {
+	return prometheus.MustNewConstMetric(
+		MetricsServerHostCpuUtilizationDesc,
+		prometheus.GaugeValue,
+		value,
+		serverType, serverName, serverID,
+	)
+}
+
+func ServerHostMemUtilization(value float64, serverType, serverName, serverID string) prometheus.Metric {
+	return prometheus.MustNewConstMetric(
+		MetricsServerHostMemUtilizationDesc,
+		prometheus.GaugeValue,
+		value,
+		serverType, serverName, serverID,
+	)
 }
 
 func LibraryDuration(value int64,
