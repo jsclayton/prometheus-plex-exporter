@@ -5,6 +5,15 @@ import (
 )
 
 var (
+	libraryLabels = []string{
+		"server_type",  // Backend type: plex
+		"server",       // Server friendly name
+		"server_id",    // Server unique id
+		"library_type", // movie, show, or artist ?
+		"library",      // Library friendly name
+		"library_id",   // Library unique id
+	}
+
 	playLabels = []string{
 		"server_type",            // Backend type: plex
 		"server",                 // Server friendly name
@@ -26,6 +35,20 @@ var (
 		"session",
 	}
 
+	MetricsLibraryDurationTotalDesc = prometheus.NewDesc(
+		"library_duration_total",
+		"Total duration of a library in ms",
+		libraryLabels,
+		nil,
+	)
+
+	MetricsLibraryStorageTotalDesc = prometheus.NewDesc(
+		"library_storage_total",
+		"Total storage size of a library in Bytes",
+		libraryLabels,
+		nil,
+	)
+
 	MetricPlayCountDesc = prometheus.NewDesc(
 		"plays_total",
 		"Total play counts",
@@ -40,6 +63,32 @@ var (
 		nil,
 	)
 )
+
+func LibraryDuration(value float64,
+	serverType, serverName, serverID,
+	libraryType, libraryName, libraryID string,
+) prometheus.Metric {
+
+	return prometheus.MustNewConstMetric(MetricsLibraryDurationTotalDesc,
+		prometheus.GaugeValue,
+		value,
+		serverType, serverName, serverID,
+		libraryType, libraryName, libraryID,
+	)
+}
+
+func LibraryStorage(value float64,
+	serverType, serverName, serverID,
+	libraryType, libraryName, libraryID string,
+) prometheus.Metric {
+
+	return prometheus.MustNewConstMetric(MetricsLibraryStorageTotalDesc,
+		prometheus.GaugeValue,
+		value,
+		serverType, serverName, serverID,
+		libraryType, libraryName, libraryID,
+	)
+}
 
 func Play(value float64, serverType, serverName, serverID,
 	library, libraryID, libraryType,

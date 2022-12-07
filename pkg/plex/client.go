@@ -5,6 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/grafana/plexporter/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Client struct {
@@ -45,7 +48,81 @@ func NewClient(serverURL, token string) (*Client, error) {
 	client.Name = rootContainer.MediaContainer.FriendlyName
 	client.Version = rootContainer.MediaContainer.Version
 
+	prometheus.MustRegister(client)
+
 	return client, nil
+}
+
+func isInterestingDirectoryType(directoryType string) bool {
+	switch directoryType {
+	case
+		"movie",
+		"show",
+		"artist":
+		return true
+	}
+	return false
+}
+
+func (c *Client) Describe(ch chan<- *prometheus.Desc) {
+	ch <- metrics.MetricsLibraryDurationTotalDesc
+	ch <- metrics.MetricsLibraryStorageTotalDesc
+}
+
+func (c *Client) Collect(ch chan<- prometheus.Metric) {
+	container := struct {
+		MediaContainer struct {
+			MediaProviders []struct {
+				Identifier string `json:"identifier"`
+				Features   []struct {
+					Type        string `json:"type"`
+					Directories []struct {
+						Identifier    string  `json:"id"`
+						DurationTotal float64 `json:"durationTotal"`
+						StorageTotal  float64 `json:"storageTotal"`
+						Title         string  `json:"title"`
+						Type          string  `json:"type"`
+					} `json:"Directory"`
+				} `json:"Feature"`
+			} `json:"MediaProvider"`
+		} `json:"MediaContainer"`
+	}{}
+	err := c.Get("/media/providers?includeStorage=1", &container)
+	if err != nil {
+		return
+	}
+
+	for _, provider := range container.MediaContainer.MediaProviders {
+		if provider.Identifier != "com.plexapp.plugins.library" {
+			continue
+		}
+		for _, feature := range provider.Features {
+			if feature.Type != "content" {
+				continue
+			}
+			for _, directory := range feature.Directories {
+				if !isInterestingDirectoryType(directory.Type) {
+					continue
+				}
+				ch <- metrics.LibraryDuration(directory.DurationTotal,
+					"plex",
+					c.Name,
+					c.Identifier,
+					directory.Type,
+					directory.Title,
+					directory.Identifier,
+				)
+				ch <- metrics.LibraryStorage(directory.StorageTotal,
+					"plex",
+					c.Name,
+					c.Identifier,
+					directory.Type,
+					directory.Title,
+					directory.Identifier,
+				)
+			}
+		}
+	}
 }
 
 func (c *Client) NewRequest(method, path string) (*http.Request, error) {
