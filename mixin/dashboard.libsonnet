@@ -244,7 +244,7 @@ local playback_dashboard =
     server_template,
   ])
   .addRow(
-    grafana.row.new('Library Overview')
+    grafana.row.new('Overview')
     .addPanels([
       hostCpuStat,
       durationStat,
