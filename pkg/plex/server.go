@@ -3,6 +3,7 @@ package plex
 import (
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/grafana/plexporter/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -41,6 +42,13 @@ func NewServer(serverURL, token string) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	ticker := time.NewTicker(time.Second * 5)
+	go func() {
+		for range ticker.C {
+			server.Refresh()
+		}
+	}()
 
 	return server, nil
 }
