@@ -1,6 +1,8 @@
 local grafana = import 'grafonnet/grafana.libsonnet';
-local graphPanel = grafana.graphPanel;
 local barGaugePanel = grafana.barGaugePanel;
+local graphPanel = grafana.graphPanel;
+local statPanel = grafana.statPanel;
+
 
 local utils = import 'snmp-mixin/lib/utils.libsonnet';
 
@@ -17,9 +19,15 @@ local dow = [
 ];
 
 local queries = {
-  duration_by_day_bc: '(sum(max_over_time(play_seconds_total{'+matcher+'}[24h])) and on() day_of_week(timestamp(play_seconds_total{'+matcher+'})) == %d) or vector(0)',
-  // duration_by_day_bc: 'sum(max_over_time(play_seconds_total{'+matcher+'}[24h])) and on() day_of_week(timestamp(play_seconds_total{'+matcher+'})) == %d',
-  duration_by_day_ts: 'sum(max_over_time(play_seconds_total{' + matcher + '}[24h])) by (media_type)',
+  library_duration: 'sum(library_duration_total{' + matcher + '}) by (library)',
+  library_storage: 'sum(library_storage_total{' + matcher + '}) by (library)',
+
+  host_cpu: 'host_cpu_util{' + matcher + '}',
+  host_mem: 'host_mem_util{' + matcher + '}',
+
+  // duration_by_day_bc: '(sum(max_over_time(play_seconds_total{'+matcher+'}[24h])) and on() day_of_week(timestamp(play_seconds_total{'+matcher+'})) == %d) or vector(0)',
+  duration_by_day_bc: 'play_seconds_total{' + matcher + '} and on() sum(max_over_time(play_seconds_total{' + matcher + '}[24h])) and on() day_of_week(timestamp(play_seconds_total{' + matcher + '})) == %d',
+  duration_by_day_ts: 'sum(max_over_time(play_seconds_total{' + matcher + '}[24h])) by (library_type)',
   duration_by_hour: 'sum(increase(play_seconds_total{' + matcher + '}[1h]))',
   duration_by_month: 'sum(increase(play_seconds_total{' + matcher + '}[30d]))',
   duration_by_user: '',
@@ -85,15 +93,109 @@ local server_template =
     refresh='load',
     multi=true,
     includeAll=true,
-    allValues='.*',
+    allValues='.+',
   );
+
+local hostCpuStat =
+  statPanel.new(
+    'Host CPU Utilization by Server',
+    description='Only available on Plex servers with PlexPass',
+    datasource='$datasource',
+    unit='percent',
+    reducerFunction='last',
+    graphMode='none',
+  )
+  .addThresholds([
+    { color: 'green', value: 0},    
+    { color: 'yellow', value: 70 },
+    { color: 'red', value: 90 },    
+  ])
+  .addTarget(
+    grafana.prometheus.target(
+      queries.host_cpu,
+      legendFormat='{{server}}'
+    )
+  ) + { span: 3 };
+
+local hostMemStat =
+  statPanel.new(
+    'Host Memory Utilization by Server',
+    description='Only available on Plex servers with PlexPass',
+    datasource='$datasource',
+    unit='percent',
+    reducerFunction='last',
+    graphMode='none',
+  )
+  .addThresholds([
+    { color: 'green', value: 0},    
+    { color: 'yellow', value: 70 },
+    { color: 'red', value: 90 },    
+  ])
+  .addTarget(
+    grafana.prometheus.target(
+      queries.host_mem,
+      legendFormat='{{server}}'
+    )
+  ) + { span: 3 };
+
+local durationStat =
+  statPanel.new(
+    'Library Duration',
+    datasource='$datasource',
+    unit='s',
+    reducerFunction='max',
+    graphMode='none',
+    colorMode='background',
+  )
+  .addTarget(
+    grafana.prometheus.target(
+      queries.library_duration,
+      legendFormat='{{library}}'
+    )
+  ) + { 
+    span: 9,
+    fieldConfig+: {
+      defaults+: {
+        color: {
+          mode: 'fixed',
+          fixedColor: 'light-blue',
+        },
+      },
+    },
+  };
+
+local storageStat =
+  statPanel.new(
+    'Library Storage',
+    datasource='$datasource',
+    unit='bytes',
+    reducerFunction='max',
+    graphMode='none',
+    colorMode='background',
+  )
+  .addTarget(
+    grafana.prometheus.target(
+      queries.library_storage,
+      legendFormat='{{library}}'
+    )
+  ) + { 
+    span: 9,
+    fieldConfig+: {
+      defaults+: {
+        color: {
+          mode: 'fixed',
+          fixedColor: 'light-purple',
+        },
+      },
+    },
+  };
 
 local durationGraph =
   graphPanel.new(
     'Duration',
     datasource='$datasource',
   )
-  .addTarget(grafana.prometheus.target(queries.duration_by_day_ts, interval='1d', legendFormat='{{media_type}}', intervalFactor=1))
+  .addTarget(grafana.prometheus.target(queries.duration_by_day_ts, interval='1d', legendFormat='{{library_type}}', intervalFactor=1))
   + utils.timeSeriesOverride(
     unit='s',
     fillOpacity=10,
@@ -109,7 +211,7 @@ local durationDayBar =
   .addTargets(
     [
       grafana.prometheus.target(std.format(queries.duration_by_day_bc, day), legendFormat=dow[day],)
-      for day in std.range(0, std.length(dow)-1)
+      for day in std.range(0, std.length(dow) - 1)
     ]
   ) {
     span: 6,
@@ -131,8 +233,8 @@ local durationDayBar =
 
 local playback_dashboard =
   grafana.dashboard.new(
-    'Playback',
-    uid=std.md5('playback.json'),
+    'Media Server',
+    uid=std.md5('mediaserver.json'),
     time_from='now-7d',
   )
   .addTemplates([
@@ -141,6 +243,15 @@ local playback_dashboard =
     instance_template,
     server_template,
   ])
+  .addRow(
+    grafana.row.new('Library Overview')
+    .addPanels([
+      hostCpuStat,
+      durationStat,
+      hostMemStat,
+      storageStat,
+    ])
+  )
   .addRow(
     grafana.row.new('Duration')
     .addPanels([
@@ -151,6 +262,6 @@ local playback_dashboard =
 
 {
   grafanaDashboards+:: {
-    'playback.json': playback_dashboard,
+    'mediaserver.json': playback_dashboard,
   },
 }
