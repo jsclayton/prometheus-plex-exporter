@@ -4,7 +4,7 @@ local barGaugePanel = grafana.barGaugePanel;
 
 local utils = import 'snmp-mixin/lib/utils.libsonnet';
 
-local matcher = 'job=~"$job", instance=~"$instance"';
+local matcher = 'job=~"$job", instance=~"$instance", server=~"$server"';
 
 local dow = [
   'Sunday',
@@ -17,8 +17,9 @@ local dow = [
 ];
 
 local queries = {
-  duration_by_day_bc: '(sum(increase(play_seconds_total[24h])) and on() day_of_week(timestamp(play_seconds_total)) == %d) or vector(0)',
-  duration_by_day_ts: 'sum(increase(play_seconds_total{' + matcher + '}[24h]))',
+  duration_by_day_bc: '(sum(max_over_time(play_seconds_total{'+matcher+'}[24h])) and on() day_of_week(timestamp(play_seconds_total{'+matcher+'})) == %d) or vector(0)',
+  // duration_by_day_bc: 'sum(max_over_time(play_seconds_total{'+matcher+'}[24h])) and on() day_of_week(timestamp(play_seconds_total{'+matcher+'})) == %d',
+  duration_by_day_ts: 'sum(max_over_time(play_seconds_total{' + matcher + '}[24h])) by (media_type)',
   duration_by_hour: 'sum(increase(play_seconds_total{' + matcher + '}[1h]))',
   duration_by_month: 'sum(increase(play_seconds_total{' + matcher + '}[30d]))',
   duration_by_user: '',
@@ -84,7 +85,7 @@ local server_template =
     refresh='load',
     multi=true,
     includeAll=true,
-    allValues='.+',
+    allValues='.*',
   );
 
 local durationGraph =
@@ -92,7 +93,7 @@ local durationGraph =
     'Duration',
     datasource='$datasource',
   )
-  .addTarget(grafana.prometheus.target(queries.duration_by_day_ts, interval='1d', legendFormat='Total'))
+  .addTarget(grafana.prometheus.target(queries.duration_by_day_ts, interval='1d', legendFormat='{{media_type}}', intervalFactor=1))
   + utils.timeSeriesOverride(
     unit='s',
     fillOpacity=10,
