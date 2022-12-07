@@ -142,7 +142,7 @@ local durationStat =
   statPanel.new(
     'Library Duration',
     datasource='$datasource',
-    unit='s',
+    unit='ms',
     reducerFunction='max',
     graphMode='none',
     colorMode='background',
