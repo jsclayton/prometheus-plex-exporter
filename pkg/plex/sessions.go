@@ -114,15 +114,19 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		title, season, episode := labels(session.media)
+		library := s.server.Library(session.media.LibrarySectionID.String())
+		if library == nil {
+			continue
+		}
 
 		ch <- metrics.Play(
 			1.0,
 			"plex",
 			s.server.Name,
 			s.server.ID,
-			session.media.LibrarySectionTitle,
-			session.media.LibrarySectionID.String(),
-			"", // Library type?
+			library.Name,
+			library.ID,
+			library.Type,
 			session.media.Type,
 			title,
 			season,
@@ -147,9 +151,9 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 			"plex",
 			s.server.Name,
 			s.server.ID,
-			session.media.LibrarySectionTitle,
-			session.media.LibrarySectionID.String(),
-			"", // Library type?
+			library.Name,
+			library.ID,
+			library.Type,
 			session.media.Type,
 			title,
 			season,

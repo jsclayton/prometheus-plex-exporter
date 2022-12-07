@@ -104,6 +104,18 @@ func (s *Server) Refresh() error {
 	return nil
 }
 
+func (s *Server) Library(id string) *Library {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	for _, library := range s.libraries {
+		if library.ID == id {
+			return library
+		}
+	}
+	return nil
+}
+
 func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 	ch <- metrics.MetricsLibraryDurationTotalDesc
 	ch <- metrics.MetricsLibraryStorageTotalDesc
@@ -115,7 +127,6 @@ func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	s.mtx.Lock()
-	defer s.mtx.Unlock()
 
 	for _, library := range s.libraries {
 		ch <- metrics.LibraryDuration(library.DurationTotal,
@@ -135,6 +146,10 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 			library.ID,
 		)
 	}
+
+	// HACK: Unlock prior to asking sessions to collect since it fetches
+	// 			 libraries by ID, which locks the server mutex
+	s.mtx.Unlock()
 
 	if s.listener != nil {
 		s.listener.activeSessions.Collect(ch)
