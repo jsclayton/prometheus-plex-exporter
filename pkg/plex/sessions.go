@@ -37,17 +37,15 @@ type session struct {
 }
 
 type sessions struct {
-	mtx        sync.Mutex
-	sessions   map[string]session
-	serverID   string
-	serverName string
+	mtx      sync.Mutex
+	sessions map[string]session
+	server   *Server
 }
 
-func NewSessions(serverName, serverID string) *sessions {
+func NewSessions(server *Server) *sessions {
 	s := &sessions{
-		sessions:   map[string]session{},
-		serverName: serverName,
-		serverID:   serverID,
+		sessions: map[string]session{},
+		server:   server,
 	}
 
 	ticker := time.NewTicker(time.Minute)
@@ -57,7 +55,6 @@ func NewSessions(serverName, serverID string) *sessions {
 		}
 	}()
 
-	prometheus.MustRegister(s)
 	return s
 }
 
@@ -121,8 +118,8 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 		ch <- metrics.Play(
 			1.0,
 			"plex",
-			s.serverName,
-			s.serverID,
+			s.server.Name,
+			s.server.ID,
 			session.media.LibrarySectionTitle,
 			session.media.LibrarySectionID.String(),
 			"", // Library type?
@@ -148,8 +145,8 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 		ch <- metrics.PlayDuration(
 			float64(totalPlayTime.Seconds()),
 			"plex",
-			s.serverName,
-			s.serverID,
+			s.server.Name,
+			s.server.ID,
 			session.media.LibrarySectionTitle,
 			session.media.LibrarySectionID.String(),
 			"", // Library type?

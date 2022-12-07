@@ -11,22 +11,26 @@ import (
 )
 
 type plexListener struct {
-	client         *Client
+	server         *Server
 	conn           *plex.Plex
 	activeSessions *sessions
 	log            log.Logger
 }
 
-func (c *Client) Listen(log log.Logger) error {
-	conn, err := plex.New(c.URL.String(), c.Token)
+func (s *Server) Listen(log log.Logger) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	conn, err := plex.New(s.URL.String(), s.Token)
 	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", c.URL.String(), err)
+		return fmt.Errorf("failed to connect to %s: %w", s.URL.String(), err)
 	}
 
-	l := &plexListener{
-		client:         c,
+	// TODO: Gracefully close any previous listener
+	s.listener = &plexListener{
+		server:         s,
 		conn:           conn,
-		activeSessions: NewSessions(c.Name, c.Identifier),
+		activeSessions: NewSessions(s),
 		log:            log,
 	}
 
@@ -37,12 +41,12 @@ func (c *Client) Listen(log log.Logger) error {
 	}
 
 	events := plex.NewNotificationEvents()
-	events.OnPlaying(l.onPlayingHandler)
+	events.OnPlaying(s.listener.onPlayingHandler)
 
 	// TODO - Does this automatically reconnect on websocket failure?
 	conn.SubscribeToNotifications(events, ctrlC, onError)
 
-	level.Info(log).Log("msg", "Successfully connected", "machineID", c.Identifier, "server", c.Name)
+	level.Info(log).Log("msg", "Successfully connected", "machineID", s.ID, "server", s.Name)
 
 	return nil
 }

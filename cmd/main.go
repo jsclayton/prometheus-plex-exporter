@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/grafana/plexporter/pkg/metrics"
 	"github.com/grafana/plexporter/pkg/plex"
 )
 
@@ -29,12 +30,14 @@ func main() {
 		return
 	}
 
-	client, err := plex.NewClient(serverAddress, plexToken)
+	server, err := plex.NewServer(serverAddress, plexToken)
 	if err != nil {
 		level.Error(log).Log("msg", err)
 		return
 	}
-	client.Listen(log)
+	server.Listen(log)
+
+	metrics.Register(server)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8000", nil)

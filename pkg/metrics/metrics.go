@@ -64,27 +64,31 @@ var (
 	)
 )
 
-func LibraryDuration(value float64,
+func Register(collectors ...prometheus.Collector) {
+	prometheus.MustRegister(collectors...)
+}
+
+func LibraryDuration(value int64,
 	serverType, serverName, serverID,
 	libraryType, libraryName, libraryID string,
 ) prometheus.Metric {
 
 	return prometheus.MustNewConstMetric(MetricsLibraryDurationTotalDesc,
 		prometheus.GaugeValue,
-		value,
+		float64(value),
 		serverType, serverName, serverID,
 		libraryType, libraryName, libraryID,
 	)
 }
 
-func LibraryStorage(value float64,
+func LibraryStorage(value int64,
 	serverType, serverName, serverID,
 	libraryType, libraryName, libraryID string,
 ) prometheus.Metric {
 
 	return prometheus.MustNewConstMetric(MetricsLibraryStorageTotalDesc,
 		prometheus.GaugeValue,
-		value,
+		float64(value),
 		serverType, serverName, serverID,
 		libraryType, libraryName, libraryID,
 	)
