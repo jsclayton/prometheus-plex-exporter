@@ -2,6 +2,7 @@ package plex
 
 import (
 	"net/url"
+	"sort"
 	"sync"
 	"time"
 
@@ -23,6 +24,14 @@ type Server struct {
 
 	mtx       sync.Mutex
 	libraries []*Library
+
+	lastBandwidthAt int
+}
+
+type StatisticsBandwidth struct {
+	At    int   `json:"at"`
+	Lan   bool  `json:"lan"`
+	Bytes int64 `json:"bytes"`
 }
 
 type StatisticsResources struct {
@@ -43,7 +52,8 @@ func NewServer(serverURL, token string) (*Server, error) {
 		URL:   client.URL,
 		Token: client.Token,
 
-		Client: client,
+		Client:          client,
+		lastBandwidthAt: int(time.Now().Unix()),
 	}
 
 	err = server.Refresh()
@@ -118,16 +128,36 @@ func (s *Server) Refresh() error {
 		}
 	}
 
+	err = s.refreshResources()
+	if err != nil {
+		return err
+	}
+
+	err = s.refreshBandwidth()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) refreshResources() error {
 	resources := struct {
 		MediaContainer struct {
 			StatisticsResources []StatisticsResources `json:"StatisticsResources"`
 		} `json:"MediaContainer"`
 	}{}
-	err = s.Client.Get("/statistics/resources?timespan=6", &resources)
-	if err != nil && err != ErrNotFound {
+	err := s.Client.Get("/statistics/resources?timespan=6", &resources)
+
+	// This is a paid feature and API may not be available
+	if err == ErrNotFound {
+		return nil
+	}
+
+	if err != nil {
 		return err
 	}
-	// This is a paid feature and API may not be available
+
 	if len(resources.MediaContainer.StatisticsResources) > 0 {
 		// The last entry is the most recent
 		i := len(resources.MediaContainer.StatisticsResources) - 1
@@ -136,6 +166,49 @@ func (s *Server) Refresh() error {
 		metrics.ServerHostCpuUtilization.WithLabelValues("plex", s.Name, s.ID).Set(stats.HostCpuUtil)
 		metrics.ServerHostMemUtilization.WithLabelValues("plex", s.Name, s.ID).Set(stats.HostMemUtil)
 	}
+
+	return nil
+}
+
+func (s *Server) refreshBandwidth() error {
+	bandwidth := struct {
+		MediaContainer struct {
+			StatisticsBandwith []StatisticsBandwidth `json:"StatisticsBandwidth"`
+		} `json:"MediaContainer"`
+	}{}
+	err := s.Client.Get("/statistics/bandwidth?timespan=6", &bandwidth)
+
+	// This is a paid feature and API may not be available
+	if err == ErrNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Record updates newer than our last sync.  We also keep track of
+	// the highest timestamp see and use that as our last sync time.
+	// Sort by timestamp to ensure they are processed in order
+	updates := bandwidth.MediaContainer.StatisticsBandwith
+
+	sort.Slice(updates, func(i, j int) bool {
+		return updates[i].At < updates[j].At
+	})
+
+	highest := 0
+	for _, u := range updates {
+		if u.At > s.lastBandwidthAt {
+			metrics.MetricTransmittedBytesTotal.WithLabelValues("plex", s.Name, s.ID).Add(float64(u.Bytes))
+
+			if u.At > highest {
+				highest = u.At
+			}
+		}
+	}
+
+	s.lastBandwidthAt = highest
+
 	return nil
 }
 

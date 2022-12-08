@@ -37,9 +37,10 @@ type session struct {
 }
 
 type sessions struct {
-	mtx      sync.Mutex
-	sessions map[string]session
-	server   *Server
+	mtx                            sync.Mutex
+	sessions                       map[string]session
+	server                         *Server
+	totalEstimatedTransmittedKBits float64
 }
 
 func NewSessions(server *Server) *sessions {
@@ -73,35 +74,51 @@ func (s *sessions) Update(sessionID string, newState sessionState, newSession *p
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	session := s.sessions[sessionID]
+	ss := s.sessions[sessionID]
 
 	if newSession != nil {
-		session.session = *newSession
+		ss.session = *newSession
 	}
 
 	if media != nil {
-		session.media = *media
+		ss.media = *media
 	}
 
-	if session.state == statePlaying && newState != statePlaying {
+	if ss.state == statePlaying && newState != statePlaying {
 		// If the session was playing but now is not, then flatten
 		// the play time into the total.
-		session.prevPlayedTime += time.Since(session.playStarted)
+		ss.prevPlayedTime += time.Since(ss.playStarted)
+		s.totalEstimatedTransmittedKBits += time.Since(ss.playStarted).Seconds() * float64(ss.session.Media[0].Bitrate)
 	}
 
-	if session.state != statePlaying && newState == statePlaying {
+	if ss.state != statePlaying && newState == statePlaying {
 		// Started playing
-		session.playStarted = time.Now()
+		ss.playStarted = time.Now()
 	}
 
-	session.state = newState
-	session.lastUpdate = time.Now()
-	s.sessions[sessionID] = session
+	ss.state = newState
+	ss.lastUpdate = time.Now()
+	s.sessions[sessionID] = ss
+}
+
+func (s *sessions) extrapolatedTransmittedBytes() float64 {
+
+	total := s.totalEstimatedTransmittedKBits
+
+	for _, ss := range s.sessions {
+		if ss.state == statePlaying {
+			total += time.Since(ss.playStarted).Seconds() * float64(ss.session.Media[0].Bitrate)
+		}
+	}
+
+	return total * 128.0 // Kbits -> Bytes, 1024 / 8
 }
 
 func (s *sessions) Describe(ch chan<- *prometheus.Desc) {
 	ch <- metrics.MetricPlayCountDesc
 	ch <- metrics.MetricPlaySecondsTotalDesc
+
+	ch <- metrics.MetricEstimatedTransmittedBytesTotal
 }
 
 func (s *sessions) Collect(ch chan<- prometheus.Metric) {
@@ -168,6 +185,9 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 			id,
 		)
 	}
+
+	ch <- prometheus.MustNewConstMetric(metrics.MetricEstimatedTransmittedBytesTotal, prometheus.CounterValue, s.extrapolatedTransmittedBytes(), "plex", s.server.Name,
+		s.server.ID)
 }
 
 func labels(m plex.Metadata) (title, season, episodeTitle string) {

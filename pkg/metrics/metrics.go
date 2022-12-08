@@ -33,10 +33,6 @@ var (
 		"session",
 	)
 
-	networkLabels = append(append([]string(nil), serverLabels...),
-		"local",
-	)
-
 	ServerHostCpuUtilization = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "host_cpu_util",
 	}, serverLabels)
@@ -73,9 +69,14 @@ var (
 		nil,
 	)
 
-	MetricNetworkTransmittedBytesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "container_network_transmit_bytes_total",
-	}, networkLabels)
+	MetricEstimatedTransmittedBytesTotal = prometheus.NewDesc(
+		"estimated_transmit_bytes_total",
+		"Total estimated bytes transmitted",
+		serverLabels, nil)
+
+	MetricTransmittedBytesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "transmit_bytes_total",
+	}, serverLabels)
 )
 
 func Register(collectors ...prometheus.Collector) {
