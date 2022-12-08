@@ -128,6 +128,11 @@ func (s *Server) Refresh() error {
 		}
 	}
 
+	err = s.refreshServerInfo()
+	if err != nil {
+		return err
+	}
+
 	err = s.refreshResources()
 	if err != nil {
 		return err
@@ -137,6 +142,25 @@ func (s *Server) Refresh() error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (s *Server) refreshServerInfo() error {
+	resp := struct {
+		MediaContainer struct {
+			Version         string `json:"version"`
+			Platform        string `json:"platform"`
+			PlatformVersion string `json:"platformVersion"`
+		} `json:"MediaContainer"`
+	}{}
+	err := s.Client.Get("/", &resp)
+
+	if err != nil {
+		return err
+	}
+
+	metrics.ServerInfo.WithLabelValues("plex", s.Name, s.ID, resp.MediaContainer.Version, resp.MediaContainer.Platform, resp.MediaContainer.PlatformVersion).Set(1.0)
 
 	return nil
 }

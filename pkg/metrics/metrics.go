@@ -33,6 +33,10 @@ var (
 		"session",
 	)
 
+	ServerInfo = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "server_info",
+	}, append(append([]string(nil), serverLabels...), "version", "platform", "platform_version"))
+
 	ServerHostCpuUtilization = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "host_cpu_util",
 	}, serverLabels)
