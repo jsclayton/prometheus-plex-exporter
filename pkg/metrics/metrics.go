@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -32,19 +33,17 @@ var (
 		"session",
 	)
 
-	MetricsServerHostCpuUtilizationDesc = prometheus.NewDesc(
-		"host_cpu_util",
-		"The host's cpu utilization",
-		serverLabels,
-		nil,
-	)
+	ServerInfo = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "server_info",
+	}, append(append([]string(nil), serverLabels...), "version", "platform", "platform_version"))
 
-	MetricsServerHostMemUtilizationDesc = prometheus.NewDesc(
-		"host_mem_util",
-		"The host's memory utilization",
-		serverLabels,
-		nil,
-	)
+	ServerHostCpuUtilization = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "host_cpu_util",
+	}, serverLabels)
+
+	ServerHostMemUtilization = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "host_mem_util",
+	}, serverLabels)
 
 	MetricsLibraryDurationTotalDesc = prometheus.NewDesc(
 		"library_duration_total",
@@ -73,28 +72,19 @@ var (
 		playLabels,
 		nil,
 	)
+
+	MetricEstimatedTransmittedBytesTotal = prometheus.NewDesc(
+		"estimated_transmit_bytes_total",
+		"Total estimated bytes transmitted",
+		serverLabels, nil)
+
+	MetricTransmittedBytesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "transmit_bytes_total",
+	}, serverLabels)
 )
 
 func Register(collectors ...prometheus.Collector) {
 	prometheus.MustRegister(collectors...)
-}
-
-func ServerHostCpuUtilization(value float64, serverType, serverName, serverID string) prometheus.Metric {
-	return prometheus.MustNewConstMetric(
-		MetricsServerHostCpuUtilizationDesc,
-		prometheus.GaugeValue,
-		value,
-		serverType, serverName, serverID,
-	)
-}
-
-func ServerHostMemUtilization(value float64, serverType, serverName, serverID string) prometheus.Metric {
-	return prometheus.MustNewConstMetric(
-		MetricsServerHostMemUtilizationDesc,
-		prometheus.GaugeValue,
-		value,
-		serverType, serverName, serverID,
-	)
 }
 
 func LibraryDuration(value int64,

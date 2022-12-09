@@ -2,6 +2,7 @@ package plex
 
 import (
 	"net/url"
+	"sort"
 	"sync"
 	"time"
 
@@ -23,7 +24,14 @@ type Server struct {
 
 	mtx       sync.Mutex
 	libraries []*Library
-	stats     StatisticsResources
+
+	lastBandwidthAt int
+}
+
+type StatisticsBandwidth struct {
+	At    int   `json:"at"`
+	Lan   bool  `json:"lan"`
+	Bytes int64 `json:"bytes"`
 }
 
 type StatisticsResources struct {
@@ -44,7 +52,8 @@ func NewServer(serverURL, token string) (*Server, error) {
 		URL:   client.URL,
 		Token: client.Token,
 
-		Client: client,
+		Client:          client,
+		lastBandwidthAt: int(time.Now().Unix()),
 	}
 
 	err = server.Refresh()
@@ -119,20 +128,111 @@ func (s *Server) Refresh() error {
 		}
 	}
 
+	err = s.refreshServerInfo()
+	if err != nil {
+		return err
+	}
+
+	err = s.refreshResources()
+	if err != nil {
+		return err
+	}
+
+	err = s.refreshBandwidth()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) refreshServerInfo() error {
+	resp := struct {
+		MediaContainer struct {
+			Version         string `json:"version"`
+			Platform        string `json:"platform"`
+			PlatformVersion string `json:"platformVersion"`
+		} `json:"MediaContainer"`
+	}{}
+	err := s.Client.Get("/", &resp)
+
+	if err != nil {
+		return err
+	}
+
+	metrics.ServerInfo.WithLabelValues("plex", s.Name, s.ID, resp.MediaContainer.Version, resp.MediaContainer.Platform, resp.MediaContainer.PlatformVersion).Set(1.0)
+
+	return nil
+}
+
+func (s *Server) refreshResources() error {
 	resources := struct {
 		MediaContainer struct {
 			StatisticsResources []StatisticsResources `json:"StatisticsResources"`
 		} `json:"MediaContainer"`
 	}{}
-	err = s.Client.Get("/statistics/resources?timespan=6", &resources)
-	if err != nil && err != ErrNotFound {
+	err := s.Client.Get("/statistics/resources?timespan=6", &resources)
+
+	// This is a paid feature and API may not be available
+	if err == ErrNotFound {
+		return nil
+	}
+
+	if err != nil {
 		return err
 	}
-	// This is a paid feature and API may not be available
+
 	if len(resources.MediaContainer.StatisticsResources) > 0 {
 		// The last entry is the most recent
-		s.stats = resources.MediaContainer.StatisticsResources[len(resources.MediaContainer.StatisticsResources)-1]
+		i := len(resources.MediaContainer.StatisticsResources) - 1
+		stats := resources.MediaContainer.StatisticsResources[i]
+
+		metrics.ServerHostCpuUtilization.WithLabelValues("plex", s.Name, s.ID).Set(stats.HostCpuUtil)
+		metrics.ServerHostMemUtilization.WithLabelValues("plex", s.Name, s.ID).Set(stats.HostMemUtil)
 	}
+
+	return nil
+}
+
+func (s *Server) refreshBandwidth() error {
+	bandwidth := struct {
+		MediaContainer struct {
+			StatisticsBandwith []StatisticsBandwidth `json:"StatisticsBandwidth"`
+		} `json:"MediaContainer"`
+	}{}
+	err := s.Client.Get("/statistics/bandwidth?timespan=6", &bandwidth)
+
+	// This is a paid feature and API may not be available
+	if err == ErrNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Record updates newer than our last sync.  We also keep track of
+	// the highest timestamp see and use that as our last sync time.
+	// Sort by timestamp to ensure they are processed in order
+	updates := bandwidth.MediaContainer.StatisticsBandwith
+
+	sort.Slice(updates, func(i, j int) bool {
+		return updates[i].At < updates[j].At
+	})
+
+	highest := 0
+	for _, u := range updates {
+		if u.At > s.lastBandwidthAt {
+			metrics.MetricTransmittedBytesTotal.WithLabelValues("plex", s.Name, s.ID).Add(float64(u.Bytes))
+
+			if u.At > highest {
+				highest = u.At
+			}
+		}
+	}
+
+	s.lastBandwidthAt = highest
+
 	return nil
 }
 
@@ -149,9 +249,6 @@ func (s *Server) Library(id string) *Library {
 }
 
 func (s *Server) Describe(ch chan<- *prometheus.Desc) {
-	ch <- metrics.MetricsServerHostCpuUtilizationDesc
-	ch <- metrics.MetricsServerHostMemUtilizationDesc
-
 	ch <- metrics.MetricsLibraryDurationTotalDesc
 	ch <- metrics.MetricsLibraryStorageTotalDesc
 
@@ -162,9 +259,6 @@ func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	s.mtx.Lock()
-
-	ch <- metrics.ServerHostCpuUtilization(s.stats.HostCpuUtil, "plex", s.Name, s.ID)
-	ch <- metrics.ServerHostMemUtilization(s.stats.HostMemUtil, "plex", s.Name, s.ID)
 
 	for _, library := range s.libraries {
 		ch <- metrics.LibraryDuration(library.DurationTotal,
