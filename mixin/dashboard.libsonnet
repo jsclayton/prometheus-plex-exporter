@@ -69,15 +69,26 @@ local queries = {
   duration_by_platform: 'sum(increase(play_seconds_total{' + matcher + '}[$__interval])) by (media_type, device_type)',
 
   duration_by_resolution: std.format(|||
-  sum(increase(
-    label_replace(
-    label_replace(
-        play_seconds_total{%s,stream_type!=""}
-    , "res", "$1", "stream_file_resolution", "(.*)")
-    , "res", "${1}p", "stream_file_resolution", "^([0-9]+)$")
-    
-  [$__interval:])) by (stream_type, res)
-|||, matcher),
+    sum(increase(
+      label_replace(
+      label_replace(
+          play_seconds_total{%s,stream_type!=""}
+      , "res", "$1", "stream_resolution", "(.*)")
+      , "res", "${1}p", "stream_resolution", "^([0-9]+)$")
+      
+    [$__interval:])) by (stream_type, res)
+  |||, matcher),
+
+  duration_by_file_resolution: std.format(|||
+    sum(increase(
+      label_replace(
+      label_replace(
+          play_seconds_total{%s,stream_type!=""}
+      , "res", "$1", "stream_file_resolution", "(.*)")
+      , "res", "${1}p", "stream_file_resolution", "^([0-9]+)$")
+      
+    [$__interval:])) by (stream_type, res)
+  |||, matcher),
 };
 
 // Templates
@@ -610,6 +621,121 @@ local topPlatformsBar =
     ],
   };
 
+// Streaming stats
+local sourceResBar =
+  barGaugePanel.new(
+    'Duration by source resolution',
+    datasource='$datasource',
+    unit='s',
+  )
+  .addTarget(grafana.prometheus.target(queries.duration_by_file_resolution, interval='5m', legendFormat='{{res}}')) {
+    type: 'barchart',
+    options+: {
+      reduceOptions+: {
+        calcs: [
+          'max',
+        ],
+      },
+      stacking: 'normal',
+      showValue: 'never',
+    },
+    fieldConfig+: {
+      defaults+: {
+        color: {
+          mode: 'palette-classic',
+        },
+      },
+    },
+    transformations: [
+      {
+        id: 'reduce',
+        options: {
+          labelsToFields: true,
+          reducers: [
+            'sum',
+          ],
+        },
+      },
+      {
+        id: 'sortBy',
+        options: {
+          fields: {},
+          sort: [
+            {
+              desc: true,
+              field: 'Total',
+            },
+          ],
+        },
+      },
+      {
+        id: 'groupingToMatrix',
+        options: {
+          columnField: 'stream_type',
+          rowField: 'res',
+          valueField: 'Total',
+        },
+      },
+    ],
+  };
+
+local streamResBar =
+  barGaugePanel.new(
+    'Duration by streamed resolution',
+    datasource='$datasource',
+    unit='s',
+  )
+  .addTarget(grafana.prometheus.target(queries.duration_by_resolution, interval='5m', legendFormat='{{res}}')) {
+    type: 'barchart',
+    options+: {
+      reduceOptions+: {
+        calcs: [
+          'max',
+        ],
+      },
+      stacking: 'normal',
+      showValue: 'never',
+    },
+    fieldConfig+: {
+      defaults+: {
+        color: {
+          mode: 'palette-classic',
+        },
+      },
+    },
+    transformations: [
+      {
+        id: 'reduce',
+        options: {
+          labelsToFields: true,
+          reducers: [
+            'sum',
+          ],
+        },
+      },
+      {
+        id: 'sortBy',
+        options: {
+          fields: {},
+          sort: [
+            {
+              desc: true,
+              field: 'Total',
+            },
+          ],
+        },
+      },
+      {
+        id: 'groupingToMatrix',
+        options: {
+          columnField: 'stream_type',
+          rowField: 'res',
+          valueField: 'Total',
+        },
+      },
+    ],
+  };
+
 local playback_dashboard =
   grafana.dashboard.new(
     'Media Server',
@@ -635,9 +761,12 @@ local playback_dashboard =
     durationGraph { gridPos: { h: 7, w: 24, x: 0, y: 17 } },
     durationDayBar { gridPos: { h: 7, w: 12, x: 0, y: 24 } },
     durationHourBar { gridPos: { h: 7, w: 12, x: 12, y: 24 } },
-    topTitlesBar {gridPos: { h: 7, w: 8, x: 0, y: 31 } },
-    topUsersBar {gridPos: { h: 7, w: 8, x: 8, y: 31 } },
-    topPlatformsBar {gridPos: { h: 7, w: 8, x: 16, y: 31 } },
+    topTitlesBar { gridPos: { h: 7, w: 8, x: 0, y: 31 } },
+    topUsersBar { gridPos: { h: 7, w: 8, x: 8, y: 31 } },
+    topPlatformsBar { gridPos: { h: 7, w: 8, x: 16, y: 31 } },
+    grafana.row.new('Streaming') { gridPos: { h: 1, w: 24, x: 0, y: 32 } },
+    sourceResBar { gridPos: { h: 7, w: 12, x: 0, y: 33 } },
+    streamResBar { gridPos: { h: 7, w: 12, x: 16, y: 33 } },
   ]);
 
 {
