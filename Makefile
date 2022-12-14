@@ -33,6 +33,7 @@ exe:
 docker-component: check-component exe
 	docker build -t grafana/$(COMPONENT) --build-arg=TARGETARCH=$(GOARCH) -f ./cmd/$(COMPONENT)/Dockerfile .
 	docker tag grafana/$(COMPONENT) $(COMPONENT)
+	docker tag grafana/$(COMPONENT) ghcr.io/grafana/$(COMPONENT)
 
 .PHONY: docker-exporter-for-plex
 docker-exporter-for-plex:
