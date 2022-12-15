@@ -21,7 +21,7 @@ run:
 
 .PHONY: exporter-for-plex
 exporter-for-plex:
-	go build $(GO_OPT) -o ./bin/$(GOOS)/exporter-for-plex-$(GOARCH) ./cmd/exporter-for-plex
+	CGO_ENABLED=0 go build $(GO_OPT) -o ./bin/$(GOOS)/exporter-for-plex-$(GOARCH) ./cmd/exporter-for-plex
 
 .PHONY: exe
 exe:
