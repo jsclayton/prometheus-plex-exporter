@@ -29,6 +29,6 @@ jobs:
     - name: Build and publish
       run: |
           make docker-images
-          docker push ghcr.io/grafana/exporter-for-plex:latest
+          docker push ghcr.io/jsclayton/prometheus-exporter-for-plex:latest
       
       
