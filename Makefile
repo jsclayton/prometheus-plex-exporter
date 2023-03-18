@@ -15,13 +15,13 @@ GO_OPT= -mod vendor -ldflags "-X main.Branch=$(GIT_BRANCH) -X main.Revision=$(GI
 
 .PHONY: run
 run:
-	go run ./cmd/exporter-for-plex
+	go run ./cmd/prometheus-plex-exporter
 
 ### Build
 
-.PHONY: exporter-for-plex
-exporter-for-plex:
-	CGO_ENABLED=0 go build $(GO_OPT) -o ./bin/$(GOOS)/exporter-for-plex-$(GOARCH) ./cmd/exporter-for-plex
+.PHONY: prometheus-plex-exporter
+prometheus-plex-exporter:
+	CGO_ENABLED=0 go build $(GO_OPT) -o ./bin/$(GOOS)/prometheus-plex-exporter-$(GOARCH) ./cmd/prometheus-plex-exporter
 
 .PHONY: exe
 exe:
@@ -31,16 +31,16 @@ exe:
 
 .PHONY: docker-component # Not intended to be used directly
 docker-component: check-component exe
-	docker build -t grafana/$(COMPONENT) --build-arg=TARGETARCH=$(GOARCH) -f ./cmd/$(COMPONENT)/Dockerfile .
-	docker tag grafana/$(COMPONENT) $(COMPONENT)
-	docker tag grafana/$(COMPONENT) ghcr.io/grafana/$(COMPONENT)
+	docker build -t jsclayton/$(COMPONENT) --build-arg=TARGETARCH=$(GOARCH) -f ./cmd/$(COMPONENT)/Dockerfile .
+	docker tag jsclayton/$(COMPONENT) $(COMPONENT)
+	docker tag jsclayton/$(COMPONENT) ghcr.io/jsclayton/$(COMPONENT)
 
-.PHONY: docker-exporter-for-plex
-docker-exporter-for-plex:
-	COMPONENT=exporter-for-plex $(MAKE) docker-component
+.PHONY: docker-prometheus-plex-exporter
+docker-prometheus-plex-exporter:
+	COMPONENT=prometheus-plex-exporter $(MAKE) docker-component
 
 .PHONY: docker-images
-docker-images: docker-exporter-for-plex
+docker-images: docker-prometheus-plex-exporter
 
 .PHONY: check-component
 check-component:
