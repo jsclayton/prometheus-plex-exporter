@@ -40,5 +40,5 @@ func main() {
 	metrics.Register(server)
 
 	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":8000", nil)
+	http.ListenAndServe(":9000", nil)
 }

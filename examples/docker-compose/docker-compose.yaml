@@ -1,0 +1,47 @@
+version: "2.4"
+
+services:
+
+  plex:
+    image: plexinc/pms-docker
+    hostname: prom-plex-exporter
+    environment:
+      PLEX_CLAIM: 
+    ports:
+      - 32400:32400/tcp
+    volumes: 
+      - plex-data:/config
+
+  plex-init:
+    image: plexinc/pms-docker
+    entrypoint: /wait-for-plex-token.sh
+    volumes:
+      - ./wait-for-plex-token.sh:/wait-for-plex-token.sh
+      - plex-shared:/plex
+      - plex-data:/config:ro
+    depends_on:
+      plex:
+        condition: service_healthy
+  
+  prom-plex:
+    image: ghcr.io/jsclayton/prometheus-plex-exporter
+    entrypoint: /set-plex-token.sh
+    environment:
+      PLEX_SERVER: http://plex:32400
+    ports:
+      - 9000:9000/tcp
+    volumes:
+      - ./set-plex-token.sh:/set-plex-token.sh
+      - plex-shared:/plex:ro
+      - plex-data:/config:ro
+    depends_on:
+      plex-init:
+        condition: service_completed_successfully
+
+volumes:
+
+  plex-data:
+    name: prom-plex-data
+
+  plex-shared:
+    name: prom-plex-shared
