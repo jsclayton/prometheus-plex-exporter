@@ -34,6 +34,8 @@ prom-plex-exporter:
     PLEX_TOKEN: <Your Plex server admin token>
 ```
 
+A sample dashboard can be found in the [examples](examples/dashboards/Media%20Server.json)
+
 # Exporting Metrics
 
 The simplest way to start visualizaing your metrics is with the Free Forever [Grafana Cloud](https://grafana.com/docs/grafana-cloud/) and [Grafana Agent](https://grafana.com/docs/agent/latest/).
