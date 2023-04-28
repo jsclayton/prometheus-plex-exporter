@@ -24,4 +24,4 @@ require (
 )
 
 // Replace for fix: https://github.com/jrudio/go-plex-client/pull/56
-replace github.com/jrudio/go-plex-client => github.com/jsclayton/go-plex-client v0.0.0-20230428220949-afd78005d7d3
+replace github.com/jrudio/go-plex-client => github.com/jsclayton/go-plex-client v0.0.0-20230428232959-d53064b6f34a

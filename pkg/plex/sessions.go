@@ -1,6 +1,7 @@
 package plex
 
 import (
+	"bytes"
 	"strconv"
 	"sync"
 	"time"
@@ -130,7 +131,7 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		title, season, episode := labels(session.media)
+		genre, title, season, episode := labels(session.media)
 		library := s.server.Library(session.media.LibrarySectionID.String())
 		if library == nil {
 			continue
@@ -145,6 +146,7 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 			library.ID,
 			library.Type,
 			session.media.Type,
+			genre,
 			title,
 			season,
 			episode,
@@ -172,6 +174,7 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 			library.ID,
 			library.Type,
 			session.media.Type,
+			genre,
 			title,
 			season,
 			episode,
@@ -190,9 +193,16 @@ func (s *sessions) Collect(ch chan<- prometheus.Metric) {
 		s.server.ID)
 }
 
-func labels(m plex.Metadata) (title, season, episodeTitle string) {
+func labels(m plex.Metadata) (genre, title, season, episodeTitle string) {
 	if m.Type == mediaTypeEpisode {
-		return m.GrandparentTitle, m.ParentTitle, m.Title
+		return "", m.GrandparentTitle, m.ParentTitle, m.Title
 	}
-	return m.Title, "", ""
+	var genres bytes.Buffer
+	for index, genre := range m.Genres {
+		genres.WriteString(genre.Tag)
+		if index < (len(m.Genres)) {
+			genres.WriteString(",")
+		}
+	}
+	return genres.String(), m.Title, "", ""
 }

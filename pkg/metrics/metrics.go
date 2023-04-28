@@ -19,7 +19,8 @@ var (
 	)
 
 	playLabels = append(append([]string(nil), libraryLabels...),
-		"media_type",             // Movies, tv_shows, music, or live_tv
+		"media_type", // Movies, tv_shows, music, or live_tv
+		"genre",
 		"title",                  // For tv shows this is the series title. For music this is the artist.
 		"child_title",            // For tv shows this is the season title. For music this is the album title.
 		"grandchild_title",       // For tv shows this is the episode title. For music this is the track title.
@@ -116,6 +117,7 @@ func LibraryStorage(value int64,
 func Play(value float64, serverType, serverName, serverID,
 	library, libraryID, libraryType,
 	mediaType,
+	genre,
 	title, childTitle, grandchildTitle,
 	streamType, streamResolution, streamFileResolution, streamBitrate,
 	device, deviceType,
@@ -128,6 +130,7 @@ func Play(value float64, serverType, serverName, serverID,
 		serverType, serverName, serverID,
 		library, libraryID, libraryType,
 		mediaType,
+		genre,
 		title, childTitle, grandchildTitle,
 		streamType, streamResolution, streamFileResolution, streamBitrate,
 		device, deviceType,
@@ -138,6 +141,7 @@ func Play(value float64, serverType, serverName, serverID,
 func PlayDuration(value float64, serverType, serverName, serverID,
 	library, libraryID, libraryType,
 	mediaType,
+	genre,
 	title, childTitle, grandchildTitle,
 	streamType, streamResolution, streamFileResolution, streamBitrate,
 	device, deviceType,
@@ -150,6 +154,7 @@ func PlayDuration(value float64, serverType, serverName, serverID,
 		serverType, serverName, serverID,
 		library, libraryID, libraryType,
 		mediaType,
+		genre,
 		title, childTitle, grandchildTitle,
 		streamType, streamResolution, streamFileResolution, streamBitrate,
 		device, deviceType,

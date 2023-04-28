@@ -49,6 +49,7 @@ type Metadata struct {
 	Art                   string       `json:"art"`
 	ContentRating         string       `json:"contentRating"`
 	Duration              int          `json:"duration"`
+	Genres                []Genre      `json:"Genre"`
 	GrandparentArt        string       `json:"grandparentArt"`
 	GrandparentKey        string       `json:"grandparentKey"`
 	GrandparentRatingKey  string       `json:"grandparentRatingKey"`
@@ -900,4 +901,11 @@ type Rating struct {
 	Image string      `json:"image"`
 	Type  string      `json:"type"`
 	Value json.Number `json:"value"`
+}
+
+// Genre
+type Genre struct {
+	Filter string      `json:"filter"`
+	ID     json.Number `json:"id"`
+	Tag    string      `json:"tag"`
 }
