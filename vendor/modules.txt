@@ -21,7 +21,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/jrudio/go-plex-client v0.0.0-20220428052413-e5b4386beb17 => github.com/mdisibio/go-plex-client v0.0.0-20221205213203-4efb1422d3c1
+# github.com/jrudio/go-plex-client v0.0.0-20220428052413-e5b4386beb17 => github.com/jsclayton/go-plex-client v0.0.0-20230428220949-afd78005d7d3
 ## explicit; go 1.12
 github.com/jrudio/go-plex-client
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -81,4 +81,4 @@ google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/timestamppb
-# github.com/jrudio/go-plex-client => github.com/mdisibio/go-plex-client v0.0.0-20221205213203-4efb1422d3c1
+# github.com/jrudio/go-plex-client => github.com/jsclayton/go-plex-client v0.0.0-20230428220949-afd78005d7d3
