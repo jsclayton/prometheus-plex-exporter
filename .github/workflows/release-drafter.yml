@@ -32,15 +32,4 @@ jobs:
         uses: release-drafter/release-drafter@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v3
-      - name: Build
-        id: build
-        uses: wangyoucao577/go-release-action@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          goos: linux
-          goarch: amd64
-          release_name: ${{ steps.update_release.outputs.name }}
       
