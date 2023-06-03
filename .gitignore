@@ -18,7 +18,7 @@
 # vendor/
 
 # Go workspace file
-go.work
+go.work*
 
 # Project specific
 .DS_Store
