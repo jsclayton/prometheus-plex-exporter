@@ -19,6 +19,8 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+          - goos: linux
+            goarch: arm64
     steps:
     - name: Checkout
       uses: actions/checkout@v3
