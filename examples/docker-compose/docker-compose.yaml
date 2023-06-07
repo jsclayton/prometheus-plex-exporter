@@ -28,6 +28,7 @@ services:
     entrypoint: /set-plex-token.sh
     environment:
       PLEX_SERVER: http://plex:32400
+      TZ=Europe/London
     ports:
       - 9000:9000/tcp
     volumes:

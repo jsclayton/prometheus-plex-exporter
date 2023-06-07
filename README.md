@@ -19,6 +19,7 @@ docker run \
   -p 9000:9000 \
   -e PLEX_SERVER="<Your Plex server URL>" \
   -e PLEX_TOKEN="<Your Plex server admin token>" \
+  -e TZ=<Your timezone>
   ghcr.io/jsclayton/prometheus-plex-exporter
 ```
 
@@ -32,6 +33,7 @@ prom-plex-exporter:
   environment:
     PLEX_SERVER: <Your Plex server URL>
     PLEX_TOKEN: <Your Plex server admin token>
+    TZ: <Your Timezone>
 ```
 
 A sample dashboard can be found in the [examples](examples/dashboards/Media%20Server.json)
