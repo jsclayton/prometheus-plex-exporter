@@ -14,8 +14,9 @@ The exporter is configured via required environment variables:
 The exporter runs via Docker:
 
 ```bash
-docker run \
-  -name prom-plex-exporter \
+docker run -d \
+  --name prom-plex-exporter \
+  --restart unless-stopped \
   -p 9000:9000 \
   -e PLEX_SERVER="<Your Plex server URL>" \
   -e PLEX_TOKEN="<Your Plex server admin token>" \
