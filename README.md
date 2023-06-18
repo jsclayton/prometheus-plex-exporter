@@ -6,8 +6,12 @@ Expose library playback, storage, and host metrics in a Prometheus format.
 
 The exporter is configured via required environment variables:
 
-- `PLEX_SERVER`: The full URL where your server can be reached, including the scheme and port (if not 80 or 443). For example `http://192.168.0.10:32400` or `https://my.plex.tld`.
+- `PLEX_SERVER`: The full URL where your server can be reached, including the scheme and port (if not 80 or 443). For example `http://192.168.0.10:32400`.
 - `PLEX_TOKEN`: A [Plex token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) belonging to the server administrator. 
+
+> **Note**
+> If you don't use an IP address for the Plex URL, all the dashboard stats won't populate.
+
 
 # Running
 
