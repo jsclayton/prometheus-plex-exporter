@@ -1,13 +1,20 @@
 package plex
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"github.com/gorilla/websocket"
 	"github.com/jrudio/go-plex-client"
+)
+
+var (
+	ErrAlreadyListening = errors.New("already listening")
 )
 
 type plexListener struct {
@@ -17,27 +24,46 @@ type plexListener struct {
 	log            log.Logger
 }
 
-func (s *Server) Listen(log log.Logger) error {
+func (s *Server) Listen(ctx context.Context, log log.Logger) error {
 	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	if s.listener != nil {
+		s.mtx.Unlock()
+		return ErrAlreadyListening
+	}
 
 	conn, err := plex.New(s.URL.String(), s.Token)
 	if err != nil {
+		s.mtx.Unlock()
 		return fmt.Errorf("failed to connect to %s: %w", s.URL.String(), err)
 	}
 
-	// TODO: Gracefully close any previous listener
 	s.listener = &plexListener{
 		server:         s,
 		conn:           conn,
-		activeSessions: NewSessions(s),
+		activeSessions: NewSessions(ctx, s),
 		log:            log,
 	}
 
-	ctrlC := make(chan os.Signal, 1)
+	s.mtx.Unlock()
 
+	// forward context completion to jrudio/go-plex-client
+	ctrlC := make(chan os.Signal, 1)
+	go func() {
+		<-ctx.Done()
+		close(ctrlC)
+	}()
+
+	doneChan := make(chan error, 1)
 	onError := func(err error) {
+		defer close(doneChan)
+		var closeErr *websocket.CloseError
+		if errors.As(err, &closeErr) {
+			if closeErr.Code == websocket.CloseNormalClosure {
+				return
+			}
+		}
 		level.Error(log).Log("msg", "error in websocket processing", "err", err)
+		doneChan <- err
 	}
 
 	events := plex.NewNotificationEvents()
@@ -45,10 +71,16 @@ func (s *Server) Listen(log log.Logger) error {
 
 	// TODO - Does this automatically reconnect on websocket failure?
 	conn.SubscribeToNotifications(events, ctrlC, onError)
+	select { // SubscribeToNotifications doesn't return error directly, so we read one from channel without blocking.
+	case err = <-doneChan:
+		return err
+	default:
+		// noop
+	}
 
 	level.Info(log).Log("msg", "Successfully connected", "machineID", s.ID, "server", s.Name)
 
-	return nil
+	return <-doneChan
 }
 
 func getSessionByID(sessions plex.CurrentSessions, sessionID string) *plex.Metadata {
