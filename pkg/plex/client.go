@@ -23,10 +23,19 @@ func NewClient(serverURL, token string) (*Client, error) {
 		return nil, err
 	}
 
+	skipTLSVerification := os.Getenv("SKIP_TLS_VERIFICATION") == "true"
+
+    // Configure the HTTP client with optional TLS verification skip
+    httpClient := &http.Client{
+        Transport: &http.Transport{
+            TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerification},
+        },
+    }
+
 	client := &Client{
 		Token:      token,
 		URL:        parsed,
-		httpClient: http.Client{},
+		httpClient: *httpClient,
 	}
 
 	return client, nil
