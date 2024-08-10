@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"crypto/tls"
+	"os"
 )
 
 var ErrNotFound = errors.New("not found")
