@@ -31,5 +31,6 @@ jobs:
       run: |
           make docker-images
           docker push ghcr.io/jsclayton/prometheus-plex-exporter:latest
+          docker push ghcr.io/jsclayton/prometheus-plex-exporter:main
       
       

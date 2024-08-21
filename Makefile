@@ -33,7 +33,8 @@ exe:
 docker-component: check-component exe
 	docker build -t jsclayton/$(COMPONENT) --build-arg=TARGETARCH=$(GOARCH) -f ./cmd/$(COMPONENT)/Dockerfile .
 	docker tag jsclayton/$(COMPONENT) $(COMPONENT)
-	docker tag jsclayton/$(COMPONENT) ghcr.io/jsclayton/$(COMPONENT)
+	docker tag jsclayton/$(COMPONENT) ghcr.io/jsclayton/$(COMPONENT):latest
+	docker tag jsclayton/$(COMPONENT) ghcr.io/jsclayton/$(COMPONENT):main
 
 .PHONY: docker-prometheus-plex-exporter
 docker-prometheus-plex-exporter:
