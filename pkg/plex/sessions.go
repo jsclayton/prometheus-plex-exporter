@@ -1,6 +1,7 @@
 package plex
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -43,7 +44,7 @@ type sessions struct {
 	totalEstimatedTransmittedKBits float64
 }
 
-func NewSessions(server *Server) *sessions {
+func NewSessions(ctx context.Context, server *Server) *sessions {
 	s := &sessions{
 		sessions: map[string]session{},
 		server:   server,
@@ -51,8 +52,14 @@ func NewSessions(server *Server) *sessions {
 
 	ticker := time.NewTicker(time.Minute)
 	go func() {
-		for range ticker.C {
-			s.pruneOldSessions()
+		for {
+			select {
+			case <-ticker.C:
+				s.pruneOldSessions()
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
 		}
 	}()
 
