@@ -15,7 +15,7 @@ The exporter runs via Docker:
 
 ```bash
 docker run \
-  -name prom-plex-exporter \
+  --name prom-plex-exporter \
   -p 9000:9000 \
   -e PLEX_SERVER="<Your Plex server URL>" \
   -e PLEX_TOKEN="<Your Plex server admin token>" \
