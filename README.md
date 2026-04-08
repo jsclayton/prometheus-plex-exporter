@@ -38,7 +38,7 @@ A sample dashboard can be found in the [examples](examples/dashboards/Media%20Se
 
 # Exporting Metrics
 
-The simplest way to start visualizaing your metrics is with the Free Forever [Grafana Cloud](https://grafana.com/docs/grafana-cloud/) and [Grafana Agent](https://grafana.com/docs/agent/latest/).
+The simplest way to start visualizing your metrics is with the Free Forever [Grafana Cloud](https://grafana.com/docs/grafana-cloud/) and [Grafana Agent](https://grafana.com/docs/agent/latest/).
 
 Here's an example config file that will read metrics from the exporter and ship them to [Prometheus](https://grafana.com/docs/grafana-cloud/data-configuration/metrics/metrics-prometheus/) via `remote_write`:
 
