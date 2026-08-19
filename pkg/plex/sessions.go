@@ -44,7 +44,7 @@ type sessions struct {
 	totalEstimatedTransmittedKBits float64
 }
 
-func NewSessions(ctx context.Context, server *Server) *sessions {
+func NewSessions(ctx context.Context, server *Server, pollSessions func() (plex.CurrentSessions, error)) *sessions {
 	s := &sessions{
 		sessions: map[string]session{},
 		server:   server,
@@ -56,6 +56,7 @@ func NewSessions(ctx context.Context, server *Server) *sessions {
 			select {
 			case <-ticker.C:
 				s.pruneOldSessions()
+				s.reconcileFromLive(pollSessions)
 			case <-ctx.Done():
 				ticker.Stop()
 				return
@@ -66,6 +67,24 @@ func NewSessions(ctx context.Context, server *Server) *sessions {
 	return s
 }
 
+func (s *sessions) reconcileFromLive(pollSessions func() (plex.CurrentSessions, error)) {
+	if pollSessions == nil {
+		return
+	}
+
+	live, err := pollSessions()
+	if err != nil {
+		return
+	}
+
+	liveSessionKeys := make(map[string]struct{}, len(live.MediaContainer.Metadata))
+	for _, session := range live.MediaContainer.Metadata {
+		liveSessionKeys[session.SessionKey] = struct{}{}
+	}
+
+	s.ReconcileActive(liveSessionKeys)
+}
+
 func (s *sessions) pruneOldSessions() {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -74,6 +93,29 @@ func (s *sessions) pruneOldSessions() {
 		if v.state == stateStopped && time.Since(v.lastUpdate) > sessionTimeout {
 			delete(s.sessions, k)
 		}
+	}
+}
+
+func (s *sessions) ReconcileActive(liveSessionKeys map[string]struct{}) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	for id, ss := range s.sessions {
+		if ss.state == stateStopped {
+			continue
+		}
+		if _, ok := liveSessionKeys[id]; ok {
+			continue
+		}
+
+		if ss.state == statePlaying {
+			ss.prevPlayedTime += time.Since(ss.playStarted)
+			s.totalEstimatedTransmittedKBits += time.Since(ss.playStarted).Seconds() * float64(ss.session.Media[0].Bitrate)
+		}
+
+		ss.state = stateStopped
+		ss.lastUpdate = time.Now()
+		s.sessions[id] = ss
 	}
 }
 

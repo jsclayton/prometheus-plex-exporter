@@ -30,8 +30,13 @@ exe:
 ### Docker Images
 
 .PHONY: docker-component # Not intended to be used directly
-docker-component: check-component exe
-	docker build -t jsclayton/$(COMPONENT) --build-arg=TARGETARCH=$(GOARCH) -f ./cmd/$(COMPONENT)/Dockerfile .
+docker-component: check-component
+	docker build -t jsclayton/$(COMPONENT) \
+		--build-arg=TARGETARCH=$(GOARCH) \
+		--build-arg=VERSION=$(VERSION) \
+		--build-arg=GIT_REVISION=$(GIT_REVISION) \
+		--build-arg=GIT_BRANCH=$(GIT_BRANCH) \
+		-f ./Dockerfile .
 	docker tag jsclayton/$(COMPONENT) $(COMPONENT)
 	docker tag jsclayton/$(COMPONENT) ghcr.io/jsclayton/$(COMPONENT):latest
 	docker tag jsclayton/$(COMPONENT) ghcr.io/jsclayton/$(COMPONENT):main
