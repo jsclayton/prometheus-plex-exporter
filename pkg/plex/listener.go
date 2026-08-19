@@ -40,7 +40,7 @@ func (s *Server) Listen(ctx context.Context, log log.Logger) error {
 	s.listener = &plexListener{
 		server:         s,
 		conn:           conn,
-		activeSessions: NewSessions(ctx, s),
+		activeSessions: NewSessions(ctx, s, conn.GetSessions),
 		log:            log,
 	}
 
@@ -104,6 +104,12 @@ func (l *plexListener) onPlaying(c plex.NotificationContainer) error {
 	if err != nil {
 		return fmt.Errorf("error fetching sessions: %w", err)
 	}
+
+	liveSessionKeys := make(map[string]struct{}, len(sessions.MediaContainer.Metadata))
+	for _, session := range sessions.MediaContainer.Metadata {
+		liveSessionKeys[session.SessionKey] = struct{}{}
+	}
+	l.activeSessions.ReconcileActive(liveSessionKeys)
 
 	for _, n := range c.PlaySessionStateNotification {
 		if sessionState(n.State) == stateStopped {
